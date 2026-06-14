@@ -32,6 +32,9 @@
     "sensor": {
       "power": {
         "name": "Power"
+      },
+      "energy": {
+        "name": "Energy"
       }
     }
   }
