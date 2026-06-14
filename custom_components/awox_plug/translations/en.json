@@ -1,0 +1,38 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add AwoX Smart Plug",
+        "description": "Select your plug from the discovered devices, or type its Bluetooth MAC address.",
+        "data": {
+          "address": "Bluetooth address (MAC)",
+          "name": "Name"
+        }
+      }
+    },
+    "error": {
+      "invalid_address": "That doesn't look like a valid Bluetooth MAC address."
+    },
+    "abort": {
+      "already_configured": "This plug is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "AwoX Smart Plug options",
+        "description": "How often to poll the plug for power and on/off state.",
+        "data": {
+          "scan_interval": "Polling interval (seconds)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "power": {
+        "name": "Power"
+      }
+    }
+  }
+}

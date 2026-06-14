@@ -1,0 +1,91 @@
+"""Revogi BLE protocol helpers for AwoX smart plugs.
+
+Reverse-engineered from the AwoX Smart Control app
+(com.awox.core.impl.RevogiSmartPlugController.Protocol).
+
+Packet layout (both directions):
+    [0x0f][len][cmd][0x00][data...][checksum][0xff][0xff]
+where:
+    len      = len(data) + 3
+    checksum = (cmd + 1 + sum(data)) & 0xFF
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+# GATT service / characteristics
+SERVICE_UUID = "0000fff0-0000-1000-8000-00805f9b34fb"
+WRITE_UUID = "0000fff3-0000-1000-8000-00805f9b34fb"
+NOTIFY_UUID = "0000fff4-0000-1000-8000-00805f9b34fb"
+
+PACKET_START = 0x0F
+
+CMD_POWER_STATE = 0x03
+CMD_POWER_CONSUMPTION = 0x04
+
+
+def build_packet(command: int, data: bytes) -> bytes:
+    """Assemble a protocol packet (mirrors Protocol.getValue())."""
+    packet = bytearray()
+    packet.append(PACKET_START)
+    packet.append((len(data) + 3) & 0xFF)
+    packet.append(command & 0xFF)
+    packet.append(0x00)
+    packet.extend(data)
+    checksum = (command + 1 + sum(data)) & 0xFF
+    packet.append(checksum)
+    packet.extend(b"\xff\xff")
+    return bytes(packet)
+
+
+# Instant consumption poll  -> 0f 05 04 00 00 00 05 ff ff (returns state + power)
+POLL_POWER = build_packet(CMD_POWER_CONSUMPTION, b"\x00\x00")
+# Power state writes        -> 0f 06 03 00 01 00 00 05 ff ff / ...00 00 04 ff ff
+CMD_TURN_ON = build_packet(CMD_POWER_STATE, b"\x01\x00\x00")
+CMD_TURN_OFF = build_packet(CMD_POWER_STATE, b"\x00\x00\x00")
+
+
+@dataclass(slots=True)
+class PlugState:
+    """Decoded plug telemetry from a command-4 response."""
+
+    is_on: bool
+    power_w: float
+
+
+class ResponseAssembler:
+    """Reassembles fragmented notifications and parses command-4 frames."""
+
+    def __init__(self) -> None:
+        self._buffer = bytearray()
+
+    def feed(self, data: bytes) -> PlugState | None:
+        """Add a notification chunk; return PlugState once a frame completes."""
+        self._buffer.extend(data)
+
+        if len(self._buffer) < 2 or self._buffer[0] != PACKET_START:
+            self._buffer.clear()
+            return None
+
+        # byte[1] is len(data)+3; the full frame adds 4 bytes of overhead.
+        expected_total = self._buffer[1] + 4
+        if len(self._buffer) < expected_total:
+            return None  # wait for remaining fragments
+
+        frame = bytes(self._buffer)
+        self._buffer.clear()
+        return _parse_power_frame(frame)
+
+
+def _parse_power_frame(frame: bytes) -> PlugState | None:
+    if len(frame) < 7 or frame[2] != CMD_POWER_CONSUMPTION:
+        return None
+    # Strip 4-byte header + 3-byte trailer to get the data section.
+    payload = frame[4:-3]
+    if len(payload) < 6:
+        return None
+    is_on = payload[0] != 0
+    # 4-byte big-endian milliwatts at payload[2:6]; the app divides by 1000 -> W.
+    milliwatts = int.from_bytes(payload[2:6], byteorder="big", signed=False)
+    return PlugState(is_on=is_on, power_w=milliwatts / 1000.0)
