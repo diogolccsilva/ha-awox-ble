@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-06-14
+
+### Fixed
+- Entities no longer become unclickable/empty when the plug is briefly
+  unreachable at startup. Setup now always creates the entities (showing
+  "unavailable" until the first successful poll) instead of aborting.
+- The coordinator now retries transient Bluetooth failures (adapter contention,
+  device asleep, missed notification) instead of failing on the first error.
+
+### Added
+- Reads the standard BLE Device Information Service (when the plug exposes it)
+  to populate the device's **Firmware** and **Hardware** version fields.
+
 ## [1.0.0] - 2026-06-14
 
 ### Added
@@ -20,5 +33,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cooperative connections via Home Assistant's Bluetooth stack
   (`bleak-retry-connector`) to avoid adapter contention.
 
-[Unreleased]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/diogolccsilva/ha-awox-ble/releases/tag/v1.0.0

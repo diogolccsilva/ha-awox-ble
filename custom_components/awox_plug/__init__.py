@@ -19,8 +19,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: AwoxPlugConfigEntry) -> 
     address: str = entry.data[CONF_ADDRESS]
     coordinator = AwoxPlugCoordinator(hass, entry, address)
 
-    # Fail setup (and retry later) if the plug can't be reached right now.
-    await coordinator.async_config_entry_first_refresh()
+    # Do an initial poll, but don't abort setup if the plug is momentarily
+    # unreachable (asleep, out of range, or briefly busy). The entities are
+    # still created so they stay visible/clickable and simply show as
+    # "unavailable" until the next successful poll recovers them.
+    await coordinator.async_refresh()
 
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

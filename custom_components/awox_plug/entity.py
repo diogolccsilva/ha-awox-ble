@@ -16,11 +16,17 @@ class AwoxPlugEntity(CoordinatorEntity[AwoxPlugCoordinator]):
 
     def __init__(self, coordinator: AwoxPlugCoordinator, name: str) -> None:
         super().__init__(coordinator)
-        address = coordinator.address
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, address)},
-            connections={(CONNECTION_BLUETOOTH, address)},
-            name=name,
+        self._device_name = name
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Built dynamically so firmware/hardware appear once read from the plug."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self.coordinator.address)},
+            connections={(CONNECTION_BLUETOOTH, self.coordinator.address)},
+            name=self._device_name,
             manufacturer=MANUFACTURER,
             model=MODEL,
+            sw_version=self.coordinator.firmware_version,
+            hw_version=self.coordinator.hardware_version,
         )
