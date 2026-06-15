@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-06-15
+
+Device-measured energy is validated against the plug, so energy reporting is
+now exclusively read from the device (no derived/approximate values).
+
+### Added
+- **Energy today** now feeds the Energy Dashboard (state_class `total` with a
+  midnight `last_reset`).
+
+### Changed
+- **Energy today / last 24h / yesterday** values confirmed correct (Wh) and
+  finalized.
+
+### Removed
+- The derived Riemann-integration **Energy** sensor (approximate). If you added
+  it to a dashboard, remove it; use **Energy today** instead.
+
+### Fixed
+- Device info no longer shows placeholder "Firmware Revision" / "Hardware
+  Revision" text when the plug returns the characteristic label instead of an
+  actual version.
+
 ## [1.2.0] - 2026-06-15
 
 ### Added
@@ -55,7 +77,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cooperative connections via Home Assistant's Bluetooth stack
   (`bleak-retry-connector`) to avoid adapter contention.
 
-[Unreleased]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.0.0...v1.0.1

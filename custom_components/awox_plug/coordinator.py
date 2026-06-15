@@ -267,7 +267,11 @@ class AwoxPlugCoordinator(DataUpdateCoordinator[PlugState]):
             except Exception:  # noqa: BLE001 - characteristic is optional
                 continue
             value = raw.decode("utf-8", "replace").strip("\x00 ").strip()
-            if value and getattr(self, attr) != value:
+            # Some plugs return the characteristic's label ("Firmware Revision")
+            # instead of a real value; only accept something version-like.
+            if not value or not any(ch.isdigit() for ch in value):
+                continue
+            if getattr(self, attr) != value:
                 setattr(self, attr, value)
                 changed = True
         if changed:

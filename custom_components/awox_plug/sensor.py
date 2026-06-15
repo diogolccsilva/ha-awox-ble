@@ -1,27 +1,26 @@
-"""Sensor entities for the AwoX Smart Plug."""
+"""Sensor entities for the AwoX Smart Plug.
+
+All energy figures are read directly from the plug's own measured history, so
+there are no derived/approximate values.
+"""
 
 from __future__ import annotations
 
-import time
+from datetime import datetime
 
 from homeassistant.components.sensor import (
-    RestoreSensor,
     SensorDeviceClass,
     SensorEntity,
     SensorStateClass,
 )
 from homeassistant.const import CONF_NAME, UnitOfEnergy, UnitOfPower
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.util import dt as dt_util
 
 from . import AwoxPlugConfigEntry
 from .const import DEFAULT_NAME
 from .entity import AwoxPlugEntity
-
-# If the plug is unreachable for longer than this, don't integrate across the
-# gap (we have no idea what the load did meanwhile) -- just restart from the
-# next live reading.
-MAX_INTEGRATION_GAP = 3600.0
 
 
 async def async_setup_entry(
@@ -35,12 +34,16 @@ async def async_setup_entry(
     async_add_entities(
         [
             AwoxPlugPowerSensor(coordinator, name),
-            AwoxPlugEnergySensor(coordinator, name),
-            # Device-measured energy (read from the plug's own history). Exposed
-            # without a state_class for now so we can validate the values before
-            # feeding them into long-term statistics / the Energy Dashboard.
+            # "Energy today" resets daily and feeds the Energy Dashboard via
+            # state_class TOTAL + a midnight last_reset. The other two are
+            # informational (no state_class).
             AwoxPlugEnergyHistorySensor(
-                coordinator, name, "energy_today", "energy_today_kwh"
+                coordinator,
+                name,
+                "energy_today",
+                "energy_today_kwh",
+                state_class=SensorStateClass.TOTAL,
+                daily_reset=True,
             ),
             AwoxPlugEnergyHistorySensor(
                 coordinator, name, "energy_24h", "energy_24h_kwh"
@@ -71,87 +74,39 @@ class AwoxPlugPowerSensor(AwoxPlugEntity, SensorEntity):
         return self.coordinator.data.power_w
 
 
-class AwoxPlugEnergySensor(AwoxPlugEntity, RestoreSensor):
-    """Energy total derived by integrating the live power reading.
-
-    This is a trapezoidal Riemann sum over the polled power values (the same
-    method as Home Assistant's Integration helper). It is an approximation
-    limited by the polling interval; a device-measured energy figure can be
-    added later. The running total is restored across restarts and feeds the
-    Energy Dashboard.
-    """
-
-    _attr_device_class = SensorDeviceClass.ENERGY
-    _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
-    _attr_state_class = SensorStateClass.TOTAL_INCREASING
-    _attr_translation_key = "energy"
-    _attr_suggested_display_precision = 3
-
-    def __init__(self, coordinator, name: str) -> None:
-        super().__init__(coordinator, name)
-        self._attr_unique_id = f"{coordinator.address}_energy"
-        self._energy_kwh: float = 0.0
-        self._last_power: float | None = None
-        self._last_time: float | None = None
-
-    async def async_added_to_hass(self) -> None:
-        await super().async_added_to_hass()
-        last = await self.async_get_last_sensor_data()
-        if last is not None and last.native_value is not None:
-            try:
-                self._energy_kwh = float(last.native_value)
-            except (TypeError, ValueError):
-                self._energy_kwh = 0.0
-        # Start integrating from the next live reading.
-        self._last_power = None
-        self._last_time = None
-
-    @property
-    def native_value(self) -> float:
-        return round(self._energy_kwh, 6)
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        data = self.coordinator.data
-        if data is None or not self.coordinator.last_update_success:
-            # Unknown gap; drop the baseline so we don't integrate over it.
-            self._last_power = None
-            self._last_time = None
-            super()._handle_coordinator_update()
-            return
-
-        now = time.monotonic()
-        power = data.power_w
-        if self._last_power is not None and self._last_time is not None:
-            dt = now - self._last_time
-            if 0.0 < dt < MAX_INTEGRATION_GAP:
-                avg_power_w = (self._last_power + power) / 2.0
-                # W * s -> kWh
-                self._energy_kwh += avg_power_w * dt / 3_600_000.0
-        self._last_power = power
-        self._last_time = now
-        super()._handle_coordinator_update()
-
-
 class AwoxPlugEnergyHistorySensor(AwoxPlugEntity, SensorEntity):
-    """Energy figure read directly from the plug's own stored history.
-
-    No ``state_class`` yet: these are exposed for validation before we trust
-    them enough to feed the Energy Dashboard / long-term statistics.
-    """
+    """Energy figure read directly from the plug's own stored history."""
 
     _attr_device_class = SensorDeviceClass.ENERGY
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
     _attr_suggested_display_precision = 3
 
-    def __init__(self, coordinator, name: str, key: str, value_attr: str) -> None:
+    def __init__(
+        self,
+        coordinator,
+        name: str,
+        key: str,
+        value_attr: str,
+        state_class: SensorStateClass | None = None,
+        daily_reset: bool = False,
+    ) -> None:
         super().__init__(coordinator, name)
         self._attr_unique_id = f"{coordinator.address}_{key}"
         self._attr_translation_key = key
+        self._attr_state_class = state_class
         self._value_attr = value_attr
+        self._daily_reset = daily_reset
 
     @property
     def native_value(self) -> float | None:
         if self.coordinator.data is None:
             return None
         return getattr(self.coordinator.data, self._value_attr)
+
+    @property
+    def last_reset(self) -> datetime | None:
+        # For a daily-resetting TOTAL, the accumulation period starts at local
+        # midnight; this lets the Energy Dashboard bucket it per day.
+        if self._daily_reset:
+            return dt_util.start_of_local_day()
+        return None

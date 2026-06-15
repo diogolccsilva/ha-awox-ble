@@ -33,9 +33,6 @@
       "power": {
         "name": "Power"
       },
-      "energy": {
-        "name": "Energy"
-      },
       "energy_today": {
         "name": "Energy today"
       },
