@@ -18,9 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stored energy history.
 
 ### Notes
-- Firmware (OTA) updates were investigated and intentionally left out of scope:
-  the app flashes firmware from binaries bundled in the APK and a bad flash can
-  brick the plug. See the README roadmap.
+- Documented deliberate out-of-scope decisions in the README roadmap so the
+  reasoning isn't lost: firmware/OTA updates (chunked flashing of binaries
+  bundled in the APK; a bad flash can brick the plug), on-device schedules
+  (commands `0x06`/`0x07`, left to HA automations), and setting the plug's
+  internal name (command `0x02`, HA names it locally instead).
 
 ## [1.4.0] - 2026-06-15
 

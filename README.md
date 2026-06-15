@@ -131,8 +131,18 @@ popup that calls the action above.
   shipping those firmware blobs and getting the flashing sequence exactly right;
   a bad flash can brick the plug, with little upside since the plug already works
   fully over BLE. Not planned.
-- **Schedules / timers** — the plug supports on-device schedules, but Home
-  Assistant automations do this better and more flexibly, so they're left to HA.
+- **Schedules / timers** — *supported by the plug, intentionally not added.*
+  The plug can store on-device on/off schedules (up to ~5 rules with weekday
+  masks and times) via commands `0x06` (write) / `0x07` (read). Home Assistant
+  automations and schedule helpers do this far better and more flexibly, work
+  even if the plug's clock drifts, and aren't limited to a handful of rules, so
+  scheduling is deliberately left to HA rather than duplicated on the device.
+- **Set the device name on the plug** — *supported by the plug, intentionally
+  not added.* The plug can store a friendly name internally via command `0x02`.
+  Home Assistant already names the device/entities locally (and that name is
+  what shows up in the UI, automations, and dashboards), so writing a separate
+  name onto the hardware adds no value and would only be a source of confusion
+  if the two ever disagreed. Renaming is deliberately kept in HA.
 
 ## Disclaimer
 
