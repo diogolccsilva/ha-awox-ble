@@ -13,8 +13,14 @@ Control Android app so that Home Assistant can talk to the hardware directly.
 ## Features
 
 - A single Home Assistant **device** per plug, with:
-  - a **switch** (outlet) whose state reflects the plug's *real* on/off status, and
-  - a **Power** sensor in watts (`device_class: power`, `state_class: measurement`).
+  - a **switch** (outlet) whose state reflects the plug's *real* on/off status,
+  - a **Power** sensor in watts (`device_class: power`, `state_class: measurement`),
+  - **device-measured energy** sensors (today / last 24 h / yesterday) read straight
+    from the plug, with *Energy today* ready for the **Energy Dashboard**, and
+  - a **Status light** switch to turn the plug's LED indicator on/off.
+- A guarded **`awox_plug.factory_reset`** action — it refuses to run unless you
+  pass `confirm: true`, so it can't fire from an accidental tap (it erases the
+  plug's stored energy history).
 - **100% local** — talks to the plug over BLE via Home Assistant's own Bluetooth
   stack. No internet, no AwoX account, no app.
 - **UI configuration** — add it from *Settings → Devices & Services*; pick the
@@ -100,6 +106,33 @@ pytest
 
 The protocol layer (`custom_components/awox_plug/protocol.py`) is dependency-free
 and fully unit-tested in `tests/`.
+
+### Factory reset
+
+There is no one-tap reset button on purpose. To reset the plug, call the
+`awox_plug.factory_reset` action and target the plug's switch entity, e.g.:
+
+```yaml
+action: awox_plug.factory_reset
+target:
+  entity_id: switch.awox_smart_plug
+data:
+  confirm: true
+```
+
+If you want a clickable control, add a dashboard button with a confirmation
+popup that calls the action above.
+
+## Roadmap / out of scope
+
+- **Firmware (OTA) updates** — *investigated, intentionally not planned.* The
+  app flashes firmware from binaries **bundled inside the APK**, streamed in
+  20-byte chunks over a dedicated characteristic. Reproducing this would mean
+  shipping those firmware blobs and getting the flashing sequence exactly right;
+  a bad flash can brick the plug, with little upside since the plug already works
+  fully over BLE. Not planned.
+- **Schedules / timers** — the plug supports on-device schedules, but Home
+  Assistant automations do this better and more flexibly, so they're left to HA.
 
 ## Disclaimer
 

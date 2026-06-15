@@ -140,3 +140,29 @@ def test_decode_daily_big_endian_ints():
 def test_decode_history_ignores_trailing_odd_bytes():
     # Two whole shorts plus a stray byte -> the stray byte is dropped.
     assert protocol.decode_hourly(bytes([0x00, 0x05, 0x00, 0x07, 0x99])) == [5, 7]
+
+
+def test_led_packets_match_app_bytes():
+    # LED set: cmd 0x0F, data {1, state, 0}; checksum = (15+1 + 1 + state) & 0xFF.
+    assert protocol.LED_ON.hex() == "0f060f0001010012ffff"
+    assert protocol.LED_OFF.hex() == "0f060f0001000011ffff"
+    # LED read: cmd 0x10, data {0,0}; checksum = (16+1) & 0xFF = 0x11.
+    assert protocol.POLL_LED.hex() == "0f051000000011ffff"
+
+
+def test_factory_reset_packet_matches_app_bytes():
+    # Factory reset: cmd 0x0F, data {0,0,0}; checksum = (15+1) & 0xFF = 0x10.
+    assert protocol.FACTORY_RESET.hex() == "0f060f0000000010ffff"
+
+
+def test_factory_reset_is_distinct_from_led():
+    # Both use cmd 0x0F; only the first data byte distinguishes them.
+    assert protocol.FACTORY_RESET != protocol.LED_OFF
+    assert protocol.FACTORY_RESET[4] == 0x00
+    assert protocol.LED_OFF[4] == 0x01
+
+
+def test_decode_led():
+    assert protocol.decode_led(b"\x01\x00") is True
+    assert protocol.decode_led(b"\x00\x00") is False
+    assert protocol.decode_led(b"") is None

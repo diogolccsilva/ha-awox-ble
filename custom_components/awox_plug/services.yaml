@@ -1,0 +1,20 @@
+factory_reset:
+  name: Factory reset
+  description: >-
+    Factory-resets the plug. This permanently erases the plug's stored energy
+    history and cannot be undone.
+  target:
+    entity:
+      integration: awox_plug
+      domain: switch
+  fields:
+    confirm:
+      name: Confirm
+      description: >-
+        Must be enabled to proceed. This erases all stored energy history on
+        the plug.
+      required: true
+      example: true
+      default: false
+      selector:
+        boolean:

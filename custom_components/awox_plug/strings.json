@@ -29,6 +29,11 @@
     }
   },
   "entity": {
+    "switch": {
+      "led": {
+        "name": "Status light"
+      }
+    },
     "sensor": {
       "power": {
         "name": "Power"
@@ -41,6 +46,18 @@
       },
       "energy_yesterday": {
         "name": "Energy yesterday"
+      }
+    }
+  },
+  "services": {
+    "factory_reset": {
+      "name": "Factory reset",
+      "description": "Factory-resets the plug. This permanently erases the plug's stored energy history and cannot be undone.",
+      "fields": {
+        "confirm": {
+          "name": "Confirm",
+          "description": "Must be enabled to proceed. This erases all stored energy history on the plug."
+        }
       }
     }
   }

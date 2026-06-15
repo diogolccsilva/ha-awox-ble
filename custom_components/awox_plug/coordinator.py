@@ -18,14 +18,19 @@ from homeassistant.util import dt as dt_util
 
 from .const import CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL, DOMAIN
 from .protocol import (
+    CMD_LED_GET,
     CMD_POWER_CONSUMPTION,
     CMD_POWER_CONSUMPTION_DAILY,
     CMD_POWER_CONSUMPTION_HOURLY,
     CMD_TURN_OFF,
     CMD_TURN_ON,
+    FACTORY_RESET,
+    LED_OFF,
+    LED_ON,
     NOTIFY_UUID,
     POLL_DAILY,
     POLL_HOURLY,
+    POLL_LED,
     POLL_POWER,
     WRITE_UUID,
     FrameAssembler,
@@ -33,6 +38,7 @@ from .protocol import (
     build_set_time,
     decode_daily,
     decode_hourly,
+    decode_led,
     frame_command,
     frame_payload,
     parse_power_frame,
@@ -87,6 +93,28 @@ class AwoxPlugCoordinator(DataUpdateCoordinator[PlugState]):
         _LOGGER.debug("%s: setting power %s", self.address, "ON" if turn_on else "OFF")
         state = await self._run(pre_command=CMD_TURN_ON if turn_on else CMD_TURN_OFF)
         self.async_set_updated_data(state)
+
+    async def async_set_led(self, turn_on: bool) -> None:
+        """Toggle the plug's status light and refresh state."""
+        _LOGGER.debug("%s: setting LED %s", self.address, "ON" if turn_on else "OFF")
+        state = await self._run(pre_command=LED_ON if turn_on else LED_OFF)
+        self.async_set_updated_data(state)
+
+    async def async_factory_reset(self) -> None:
+        """Factory-reset the plug. Erases its stored energy history."""
+        async with self._lock:
+            ble_device = self._get_ble_device()
+            client = await establish_connection(
+                BleakClientWithServiceCache, ble_device, self.name
+            )
+            try:
+                _LOGGER.warning("%s: sending FACTORY RESET", self.address)
+                await client.write_gatt_char(WRITE_UUID, FACTORY_RESET, response=True)
+            finally:
+                try:
+                    await client.disconnect()
+                except Exception:  # noqa: BLE001 - plug resets and drops the link
+                    pass
 
     def _get_ble_device(self) -> BLEDevice:
         ble_device = bluetooth.async_ble_device_from_address(
@@ -186,6 +214,11 @@ class AwoxPlugCoordinator(DataUpdateCoordinator[PlugState]):
 
             self._apply_history(state, hourly_frame, daily_frame)
 
+            await asyncio.sleep(WRITE_SETTLE)
+            led_frame = await _exchange(POLL_LED, CMD_LED_GET, NOTIFY_TIMEOUT)
+            if led_frame is not None:
+                state.led_on = decode_led(frame_payload(led_frame))
+
             try:
                 await client.stop_notify(NOTIFY_UUID)
             except Exception:  # noqa: BLE001 - disconnect cleans up regardless
@@ -195,13 +228,15 @@ class AwoxPlugCoordinator(DataUpdateCoordinator[PlugState]):
                 await self._read_device_information(client)
 
             _LOGGER.debug(
-                "%s: poll ok -> is_on=%s power=%.3f W today=%s 24h=%s yesterday=%s",
+                "%s: poll ok -> is_on=%s power=%.3f W today=%s 24h=%s "
+                "yesterday=%s led=%s",
                 self.address,
                 state.is_on,
                 state.power_w,
                 state.energy_today_kwh,
                 state.energy_24h_kwh,
                 state.energy_yesterday_kwh,
+                state.led_on,
             )
             return state
         finally:

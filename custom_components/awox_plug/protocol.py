@@ -27,6 +27,9 @@ CMD_POWER_STATE = 0x03
 CMD_POWER_CONSUMPTION = 0x04
 CMD_POWER_CONSUMPTION_HOURLY = 0x0A
 CMD_POWER_CONSUMPTION_DAILY = 0x0B
+# Command 0x0F sets the LED (data starts 0x01) OR factory-resets (data 00 00 00).
+CMD_LED_SET = 0x0F
+CMD_LED_GET = 0x10
 
 
 def build_packet(command: int, data: bytes) -> bytes:
@@ -52,6 +55,12 @@ POLL_DAILY = build_packet(CMD_POWER_CONSUMPTION_DAILY, b"\x00\x00")
 # Power state writes         -> 0f 06 03 00 01 00 00 05 ff ff / ...00 00 04 ff ff
 CMD_TURN_ON = build_packet(CMD_POWER_STATE, b"\x01\x00\x00")
 CMD_TURN_OFF = build_packet(CMD_POWER_STATE, b"\x00\x00\x00")
+# LED status-light control (cmd 0x0F, data = 01 <state> 00) and readback (0x10).
+LED_ON = build_packet(CMD_LED_SET, b"\x01\x01\x00")
+LED_OFF = build_packet(CMD_LED_SET, b"\x01\x00\x00")
+POLL_LED = build_packet(CMD_LED_GET, b"\x00\x00")
+# Factory reset (cmd 0x0F, data = 00 00 00). Erases the plug's stored history.
+FACTORY_RESET = build_packet(CMD_LED_SET, b"\x00\x00\x00")
 
 
 def build_set_time(now: datetime) -> bytes:
@@ -92,6 +101,7 @@ class PlugState:
     energy_today_kwh: float | None = None
     energy_24h_kwh: float | None = None
     energy_yesterday_kwh: float | None = None
+    led_on: bool | None = None
 
 
 class FrameAssembler:
@@ -158,6 +168,13 @@ def decode_daily(payload: bytes) -> list[int]:
         int.from_bytes(payload[i : i + 4], "big", signed=False)
         for i in range(0, len(payload) - 3, 4)
     ]
+
+
+def decode_led(payload: bytes) -> bool | None:
+    """Command-0x10 payload -> LED on/off (payload[0] == 1)."""
+    if not payload:
+        return None
+    return payload[0] == 1
 
 
 class ResponseAssembler:

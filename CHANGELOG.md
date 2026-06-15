@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-06-15
+
+### Added
+- **Status light** switch (config entity) to turn the plug's LED indicator
+  on/off (set command `0x0F` with data `01 <state> 00`, read via `0x10`).
+- **`awox_plug.factory_reset`** action to factory-reset the plug (command
+  `0x0F` with data `00 00 00`). It is guarded by a required `confirm: true`
+  flag so it can never fire from an accidental press, and it erases the plug's
+  stored energy history.
+
+### Notes
+- Firmware (OTA) updates were investigated and intentionally left out of scope:
+  the app flashes firmware from binaries bundled in the APK and a bad flash can
+  brick the plug. See the README roadmap.
+
 ## [1.4.0] - 2026-06-15
 
 ### Added
