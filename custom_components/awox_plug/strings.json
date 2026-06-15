@@ -35,6 +35,15 @@
       },
       "energy": {
         "name": "Energy"
+      },
+      "energy_today": {
+        "name": "Energy today"
+      },
+      "energy_24h": {
+        "name": "Energy last 24h"
+      },
+      "energy_yesterday": {
+        "name": "Energy yesterday"
       }
     }
   }

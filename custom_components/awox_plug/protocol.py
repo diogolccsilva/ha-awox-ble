@@ -23,6 +23,8 @@ PACKET_START = 0x0F
 
 CMD_POWER_STATE = 0x03
 CMD_POWER_CONSUMPTION = 0x04
+CMD_POWER_CONSUMPTION_HOURLY = 0x0A
+CMD_POWER_CONSUMPTION_DAILY = 0x0B
 
 
 def build_packet(command: int, data: bytes) -> bytes:
@@ -41,51 +43,105 @@ def build_packet(command: int, data: bytes) -> bytes:
 
 # Instant consumption poll  -> 0f 05 04 00 00 00 05 ff ff (returns state + power)
 POLL_POWER = build_packet(CMD_POWER_CONSUMPTION, b"\x00\x00")
-# Power state writes        -> 0f 06 03 00 01 00 00 05 ff ff / ...00 00 04 ff ff
+# Hourly energy history      -> 0f 05 0a 00 00 00 0b ff ff (rolling ~24h, Wh/hour)
+POLL_HOURLY = build_packet(CMD_POWER_CONSUMPTION_HOURLY, b"\x00\x00")
+# Daily energy history       -> 0f 05 0b 00 00 00 0c ff ff (rolling ~30d, Wh/day)
+POLL_DAILY = build_packet(CMD_POWER_CONSUMPTION_DAILY, b"\x00\x00")
+# Power state writes         -> 0f 06 03 00 01 00 00 05 ff ff / ...00 00 04 ff ff
 CMD_TURN_ON = build_packet(CMD_POWER_STATE, b"\x01\x00\x00")
 CMD_TURN_OFF = build_packet(CMD_POWER_STATE, b"\x00\x00\x00")
 
 
 @dataclass(slots=True)
 class PlugState:
-    """Decoded plug telemetry from a command-4 response."""
+    """Decoded plug telemetry.
+
+    ``is_on``/``power_w`` come from the command-4 response. The energy fields
+    are derived from the hourly/daily history (command 0x0A / 0x0B) and may be
+    ``None`` if that history wasn't read this cycle.
+    """
 
     is_on: bool
     power_w: float
+    energy_today_kwh: float | None = None
+    energy_24h_kwh: float | None = None
+    energy_yesterday_kwh: float | None = None
 
 
-class ResponseAssembler:
-    """Reassembles fragmented notifications and parses command-4 frames."""
+class FrameAssembler:
+    """Reassembles fragmented notifications into complete protocol frames."""
 
     def __init__(self) -> None:
         self._buffer = bytearray()
 
-    def feed(self, data: bytes) -> PlugState | None:
-        """Add a notification chunk; return PlugState once a frame completes."""
+    def feed(self, data: bytes) -> bytes | None:
+        """Add a notification chunk; return a full frame once one completes."""
         self._buffer.extend(data)
-
         if len(self._buffer) < 2 or self._buffer[0] != PACKET_START:
             self._buffer.clear()
             return None
-
         # byte[1] is len(data)+3; the full frame adds 4 bytes of overhead.
         expected_total = self._buffer[1] + 4
         if len(self._buffer) < expected_total:
-            return None  # wait for remaining fragments
+            return None
+        frame = bytes(self._buffer[:expected_total])
+        del self._buffer[:expected_total]
+        return frame
 
-        frame = bytes(self._buffer)
-        self._buffer.clear()
-        return _parse_power_frame(frame)
+
+def frame_command(frame: bytes) -> int:
+    """The command byte of a complete frame."""
+    return frame[2]
 
 
-def _parse_power_frame(frame: bytes) -> PlugState | None:
+def frame_payload(frame: bytes) -> bytes:
+    """The data section (4-byte header + 3-byte trailer stripped)."""
+    return frame[4:-3]
+
+
+def parse_power_frame(frame: bytes) -> PlugState | None:
+    """Decode a command-4 (instant power + on/off) frame."""
     if len(frame) < 7 or frame[2] != CMD_POWER_CONSUMPTION:
         return None
-    # Strip 4-byte header + 3-byte trailer to get the data section.
-    payload = frame[4:-3]
+    payload = frame_payload(frame)
     if len(payload) < 6:
         return None
     is_on = payload[0] != 0
     # 4-byte big-endian milliwatts at payload[2:6]; the app divides by 1000 -> W.
     milliwatts = int.from_bytes(payload[2:6], byteorder="big", signed=False)
     return PlugState(is_on=is_on, power_w=milliwatts / 1000.0)
+
+
+def decode_hourly(payload: bytes) -> list[int]:
+    """Command-0x0A payload -> list of 16-bit big-endian values (Wh per hour).
+
+    Chronological order; the last value is the current (partial) hour.
+    """
+    return [
+        int.from_bytes(payload[i : i + 2], "big", signed=False)
+        for i in range(0, len(payload) - 1, 2)
+    ]
+
+
+def decode_daily(payload: bytes) -> list[int]:
+    """Command-0x0B payload -> list of 32-bit big-endian values (Wh per day).
+
+    Chronological order; the last value is the most recent completed day.
+    """
+    return [
+        int.from_bytes(payload[i : i + 4], "big", signed=False)
+        for i in range(0, len(payload) - 3, 4)
+    ]
+
+
+class ResponseAssembler:
+    """Convenience wrapper that yields a PlugState from command-4 frames."""
+
+    def __init__(self) -> None:
+        self._frames = FrameAssembler()
+
+    def feed(self, data: bytes) -> PlugState | None:
+        frame = self._frames.feed(data)
+        if frame is None:
+            return None
+        return parse_power_frame(frame)

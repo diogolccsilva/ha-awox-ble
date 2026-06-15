@@ -36,6 +36,18 @@ async def async_setup_entry(
         [
             AwoxPlugPowerSensor(coordinator, name),
             AwoxPlugEnergySensor(coordinator, name),
+            # Device-measured energy (read from the plug's own history). Exposed
+            # without a state_class for now so we can validate the values before
+            # feeding them into long-term statistics / the Energy Dashboard.
+            AwoxPlugEnergyHistorySensor(
+                coordinator, name, "energy_today", "energy_today_kwh"
+            ),
+            AwoxPlugEnergyHistorySensor(
+                coordinator, name, "energy_24h", "energy_24h_kwh"
+            ),
+            AwoxPlugEnergyHistorySensor(
+                coordinator, name, "energy_yesterday", "energy_yesterday_kwh"
+            ),
         ]
     )
 
@@ -119,3 +131,27 @@ class AwoxPlugEnergySensor(AwoxPlugEntity, RestoreSensor):
         self._last_power = power
         self._last_time = now
         super()._handle_coordinator_update()
+
+
+class AwoxPlugEnergyHistorySensor(AwoxPlugEntity, SensorEntity):
+    """Energy figure read directly from the plug's own stored history.
+
+    No ``state_class`` yet: these are exposed for validation before we trust
+    them enough to feed the Energy Dashboard / long-term statistics.
+    """
+
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+    _attr_suggested_display_precision = 3
+
+    def __init__(self, coordinator, name: str, key: str, value_attr: str) -> None:
+        super().__init__(coordinator, name)
+        self._attr_unique_id = f"{coordinator.address}_{key}"
+        self._attr_translation_key = key
+        self._value_attr = value_attr
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        return getattr(self.coordinator.data, self._value_attr)

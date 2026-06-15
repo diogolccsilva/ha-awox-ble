@@ -28,6 +28,12 @@ def test_build_packet_matches_app_bytes():
     assert protocol.CMD_TURN_OFF.hex() == "0f06030000000004ffff"
 
 
+def test_history_request_packets():
+    # Hourly: cmd 0x0A, checksum (10+1)=0x0b; Daily: cmd 0x0B, checksum (11+1)=0x0c.
+    assert protocol.POLL_HOURLY.hex() == "0f050a0000000bffff"
+    assert protocol.POLL_DAILY.hex() == "0f050b0000000cffff"
+
+
 def test_checksum_formula():
     # cmd=3, data={1,0,0} -> checksum = (3 + 1 + 1) & 0xFF = 5
     pkt = protocol.build_packet(0x03, b"\x01\x00\x00")
@@ -87,3 +93,32 @@ def test_partial_frame_returns_none_until_complete():
     assert assembler.feed(frame[:-1]) is None
     # Final byte completes it.
     assert assembler.feed(frame[-1:]) is not None
+
+
+def _history_frame(command: int, data: bytes) -> bytes:
+    body = bytes([command, 0]) + data
+    return bytes([protocol.PACKET_START, len(data) + 3]) + body + b"\x00\xff\xff"
+
+
+def test_frame_assembler_returns_command_and_payload():
+    data = bytes([0x00, 0x32, 0x00, 0x10])  # two 16-bit values: 50, 16
+    frame = _history_frame(protocol.CMD_POWER_CONSUMPTION_HOURLY, data)
+    out = protocol.FrameAssembler().feed(frame)
+    assert out is not None
+    assert protocol.frame_command(out) == protocol.CMD_POWER_CONSUMPTION_HOURLY
+    assert protocol.frame_payload(out) == data
+
+
+def test_decode_hourly_big_endian_shorts():
+    data = bytes([0x00, 0x32, 0x00, 0x10, 0x01, 0x00])  # 50, 16, 256
+    assert protocol.decode_hourly(data) == [50, 16, 256]
+
+
+def test_decode_daily_big_endian_ints():
+    data = (1000).to_bytes(4, "big") + (65540).to_bytes(4, "big")
+    assert protocol.decode_daily(data) == [1000, 65540]
+
+
+def test_decode_history_ignores_trailing_odd_bytes():
+    # Two whole shorts plus a stray byte -> the stray byte is dropped.
+    assert protocol.decode_hourly(bytes([0x00, 0x05, 0x00, 0x07, 0x99])) == [5, 7]
