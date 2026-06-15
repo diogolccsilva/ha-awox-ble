@@ -13,6 +13,7 @@ where:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
 # GATT service / characteristics
 SERVICE_UUID = "0000fff0-0000-1000-8000-00805f9b34fb"
@@ -21,6 +22,7 @@ NOTIFY_UUID = "0000fff4-0000-1000-8000-00805f9b34fb"
 
 PACKET_START = 0x0F
 
+CMD_SET_TIME = 0x01
 CMD_POWER_STATE = 0x03
 CMD_POWER_CONSUMPTION = 0x04
 CMD_POWER_CONSUMPTION_HOURLY = 0x0A
@@ -50,6 +52,30 @@ POLL_DAILY = build_packet(CMD_POWER_CONSUMPTION_DAILY, b"\x00\x00")
 # Power state writes         -> 0f 06 03 00 01 00 00 05 ff ff / ...00 00 04 ff ff
 CMD_TURN_ON = build_packet(CMD_POWER_STATE, b"\x01\x00\x00")
 CMD_TURN_OFF = build_packet(CMD_POWER_STATE, b"\x00\x00\x00")
+
+
+def build_set_time(now: datetime) -> bytes:
+    """Set the plug's internal RTC (command 0x01) from a local datetime.
+
+    Data layout (mirrors the app): sec, min, hour, day, month, year_hi,
+    year_lo, then four reserved zero bytes.
+    """
+    data = bytes(
+        [
+            now.second & 0xFF,
+            now.minute & 0xFF,
+            now.hour & 0xFF,
+            now.day & 0xFF,
+            now.month & 0xFF,
+            (now.year >> 8) & 0xFF,
+            now.year & 0xFF,
+            0,
+            0,
+            0,
+            0,
+        ]
+    )
+    return build_packet(CMD_SET_TIME, data)
 
 
 @dataclass(slots=True)

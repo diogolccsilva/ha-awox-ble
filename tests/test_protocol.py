@@ -34,6 +34,24 @@ def test_history_request_packets():
     assert protocol.POLL_DAILY.hex() == "0f050b0000000cffff"
 
 
+def test_build_set_time_matches_app_layout():
+    from datetime import datetime
+
+    # 2026-06-15 09:30:45  (year 2026 = 0x07EA -> hi=0x07, lo=0xEA)
+    pkt = protocol.build_set_time(datetime(2026, 6, 15, 9, 30, 45))
+    # data = sec,min,hour,day,month,year_hi,year_lo,0,0,0,0
+    data = bytes([45, 30, 9, 15, 6, 0x07, 0xEA, 0, 0, 0, 0])
+    checksum = (protocol.CMD_SET_TIME + 1 + sum(data)) & 0xFF
+    expected = (
+        bytes([0x0F, len(data) + 3, protocol.CMD_SET_TIME, 0x00])
+        + data
+        + bytes([checksum])
+        + b"\xff\xff"
+    )
+    assert pkt == expected
+    assert pkt.hex() == "0f0e01002d1e090f0607ea000000005cffff"
+
+
 def test_checksum_formula():
     # cmd=3, data={1,0,0} -> checksum = (3 + 1 + 1) & 0xFF = 5
     pkt = protocol.build_packet(0x03, b"\x01\x00\x00")

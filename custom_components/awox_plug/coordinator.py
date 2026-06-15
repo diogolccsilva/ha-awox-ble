@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from datetime import timedelta
 
 from bleak.backends.device import BLEDevice
@@ -29,6 +30,7 @@ from .protocol import (
     WRITE_UUID,
     FrameAssembler,
     PlugState,
+    build_set_time,
     decode_daily,
     decode_hourly,
     frame_command,
@@ -47,6 +49,9 @@ WRITE_SETTLE = 0.2
 # Retry transient BLE failures (adapter contention, device briefly asleep, etc.).
 ATTEMPTS = 3
 RETRY_DELAY = 1.5
+# Re-sync the plug's clock at most this often (it has no battery-backed RTC, so
+# it drifts/resets after a power cut, which would misalign the energy buckets).
+CLOCK_RESYNC_INTERVAL = 3600.0
 
 # Standard BLE Device Information Service characteristics (optional on the plug).
 FIRMWARE_REV_UUID = "00002a26-0000-1000-8000-00805f9b34fb"
@@ -72,6 +77,7 @@ class AwoxPlugCoordinator(DataUpdateCoordinator[PlugState]):
         self.hardware_version: str | None = None
         self._device_info_read = False
         self._history_logged = False
+        self._clock_synced_at: float | None = None
 
     async def _async_update_data(self) -> PlugState:
         return await self._run()
@@ -152,6 +158,8 @@ class AwoxPlugCoordinator(DataUpdateCoordinator[PlugState]):
         try:
             await client.start_notify(NOTIFY_UUID, _on_notify)
 
+            await self._maybe_sync_clock(client)
+
             if pre_command is not None:
                 await client.write_gatt_char(WRITE_UUID, pre_command, response=True)
                 await asyncio.sleep(WRITE_SETTLE)
@@ -198,6 +206,30 @@ class AwoxPlugCoordinator(DataUpdateCoordinator[PlugState]):
             return state
         finally:
             await client.disconnect()
+
+    async def _maybe_sync_clock(self, client: BleakClientWithServiceCache) -> None:
+        """Keep the plug's RTC aligned with HA local time (best effort).
+
+        Sets it on the first connect and again once it's older than
+        CLOCK_RESYNC_INTERVAL, so the device's energy buckets line up with the
+        real local day even after the plug has lost power.
+        """
+        now = time.monotonic()
+        if (
+            self._clock_synced_at is not None
+            and now - self._clock_synced_at < CLOCK_RESYNC_INTERVAL
+        ):
+            return
+        try:
+            await client.write_gatt_char(
+                WRITE_UUID, build_set_time(dt_util.now()), response=True
+            )
+        except Exception as err:  # noqa: BLE001 - clock sync must not break the poll
+            _LOGGER.debug("%s: clock sync failed: %s", self.address, err)
+            return
+        self._clock_synced_at = now
+        _LOGGER.debug("%s: clock synced to %s", self.address, dt_util.now().isoformat())
+        await asyncio.sleep(WRITE_SETTLE)
 
     def _apply_history(
         self, state: PlugState, hourly_frame: bytes | None, daily_frame: bytes | None

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-06-15
+
+### Added
+- Keeps the plug's internal clock synced to Home Assistant local time
+  (command `0x01`): set on connect and re-synced if it's been over an hour.
+  The plug buckets energy by its own RTC and has no battery backup, so this
+  keeps "Energy today/yesterday" aligned to the real day even after a power cut.
+
 ## [1.3.0] - 2026-06-15
 
 Device-measured energy is validated against the plug, so energy reporting is
@@ -77,7 +85,8 @@ now exclusively read from the device (no derived/approximate values).
 - Cooperative connections via Home Assistant's Bluetooth stack
   (`bleak-retry-connector`) to avoid adapter contention.
 
-[Unreleased]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.0.1...v1.1.0
