@@ -149,6 +149,9 @@ popup that calls the action above.
 This is an unofficial, community integration. "AwoX" and "Revogi" are trademarks
 of their respective owners. Use at your own risk.
 
+This integration was built with AI assistance (vibe coded), and reviewed,
+supervised, and tested on real hardware by the author.
+
 ## License
 
 [MIT](LICENSE)
