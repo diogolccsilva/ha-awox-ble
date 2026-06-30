@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-06-30
+
+### Fixed
+- Integration logo now actually shows in Home Assistant. The brand images are
+  moved into `custom_components/awox_plug/brand/` (the location HA's brands
+  proxy serves from since HA 2026.3) and converted to real PNG files — the
+  previous `icon.png` was a WebP file misnamed as `.png` placed in the wrong
+  directory, so it was never used.
+- Added `icon@2x.png`, `logo.png`, and `logo@2x.png` brand variants.
+
 ## [1.6.0] - 2026-06-30
 
 ### Added
@@ -114,7 +124,8 @@ now exclusively read from the device (no derived/approximate values).
 - Cooperative connections via Home Assistant's Bluetooth stack
   (`bleak-retry-connector`) to avoid adapter contention.
 
-[Unreleased]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.6.1...HEAD
+[1.6.1]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.3.0...v1.4.0
