@@ -1,5 +1,7 @@
 # AwoX Smart Plug over Bluetooth — Home Assistant integration
 
+<img src="custom_components/awox_plug/icon.png" alt="AwoX logo" width="80">
+
 [![hacs][hacs-badge]][hacs] [![validate][validate-badge]][validate-workflow] [![tests][tests-badge]][tests-workflow]
 
 A local **Bluetooth (BLE)** integration for Home Assistant that replicates what

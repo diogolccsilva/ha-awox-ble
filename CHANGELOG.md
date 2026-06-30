@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-06-30
+
+### Added
+- Integration icon (`icon.png`) placed inside the component directory so Home
+  Assistant displays the AwoX logo on the integration card, device page, and
+  HACS listing.
+
+### Notes
+- README now shows the logo at the top for GitHub and HACS.
+- Added a note in the disclaimer acknowledging that the integration was
+  AI-assisted and supervised/tested by the author.
+
 ## [1.5.0] - 2026-06-15
 
 ### Added
@@ -102,7 +114,9 @@ now exclusively read from the device (no derived/approximate values).
 - Cooperative connections via Home Assistant's Bluetooth stack
   (`bleak-retry-connector`) to avoid adapter contention.
 
-[Unreleased]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.5.0...v1.6.0
+[1.5.0]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/diogolccsilva/ha-awox-ble/compare/v1.1.0...v1.2.0
